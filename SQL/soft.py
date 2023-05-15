@@ -17,6 +17,7 @@ def sum_expenses(period):
     # и т.д.
     return sum_num
 
+
 def add_expense(message):
     global num, sum_num
     try:
@@ -26,6 +27,7 @@ def add_expense(message):
     except ValueError:
         bot.send_message(message.chat.id, text="Введите число")
         bot.register_next_step_handler(message, add_expense)
+
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -45,8 +47,9 @@ def choice(message):
     btn1 = types.KeyboardButton("Сколько я потратил за день?")
     btn2 = types.KeyboardButton("Сколько я потратил за неделю?")
     btn3 = types.KeyboardButton("Сколько я потратил за месяц?")
+    btn4 = types.KeyboardButton("Добавить расход")
     back = types.KeyboardButton("Вернуться в главное меню")
-    markup.add(btn1, btn2, btn3, back)
+    markup.add(btn1, btn2, btn3, btn4, back)
     bot.send_message(message.chat.id, text="Посмотреть свои расходы", reply_markup=markup)
 
 
