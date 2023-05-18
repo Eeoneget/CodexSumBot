@@ -1,31 +1,35 @@
 import telebot
-from telebot import types  # для указанья типов
+from telebot import types
 import config
 
 bot = telebot.TeleBot(config.token, threaded=False)
 
-num = 0
-sum_num = 0
+total_expenses = 0
 
-def sum_expenses(period):
-    # здесь должен быть код, который вычисляет сумму расходов за указанный период
-    # в зависимости от значения параметра period
-    # например, если period равен "day", то нужно вычислить сумму расходов за день
-    # и вернуть это значение
-    # если period равен "week", то нужно вычислить сумму расходов за неделю
-    # и вернуть это значение
-    # и т.д.
-    return sum_num
+expense_categories = {
+    "Такси": 0,
+    "Дом": 0,
+    "Транспорт": 0,
+    "Еда": 0,
+    "Развлечения": 0
+}
 
 
 def add_expense(message):
-    global num, sum_num
-    try:
-        num = float(message.text)
-        sum_num += num
-        bot.send_message(message.chat.id, text="Расход добавлен. Всего расходов: {}".format(sum_num))
-    except ValueError:
-        bot.send_message(message.chat.id, text="Введите число")
+    global total_expenses
+
+    if message.text in expense_categories:
+        try:
+            expense_value = float(message.text)
+            expense_category = message.text
+            expense_categories[expense_category] += expense_value
+            total_expenses += expense_value
+            bot.send_message(message.chat.id, text="Расход добавлен. Всего расходов: {}".format(total_expenses))
+        except ValueError:
+            bot.send_message(message.chat.id, text="Введите число")
+            bot.register_next_step_handler(message, add_expense)
+    else:
+        bot.send_message(message.chat.id, text="Выберете один из предложенных видов расходов.")
         bot.register_next_step_handler(message, add_expense)
 
 
@@ -37,7 +41,7 @@ def start(message):
     btn3 = types.KeyboardButton("Добавить расход")
     markup.add(btn1, btn2, btn3)
     bot.send_message(message.chat.id,
-                     text="Привет, {0.first_name}! Я телеграмм бот для финансирование!".format(
+                     text="Привет, {0.first_name}! Я телеграмм бот для финансирования!".format(
                          message.from_user), reply_markup=markup)
 
 
@@ -61,7 +65,7 @@ def helping_hand(message):
 @bot.message_handler(content_types=['text'])
 def func(message):
 
-    global num, sum_num
+    global num, total_expenses
 
     if message.text == "Поздороваться":
         bot.send_message(message.chat.id, text="""Привет Codex!
@@ -72,15 +76,15 @@ def func(message):
         bot.register_next_step_handler(message, add_expense)
 
     elif message.text == "Сколько я потратил за день?":
-        today = sum_expenses("day")
+        today = int(total_expenses)
         bot.send_message(message.chat.id, text="Вы потратили {} за день".format(today))
 
     elif message.text == "Сколько я потратил за неделю?":
-        week = sum_expenses("week")
+        week = int(total_expenses)
         bot.send_message(message.chat.id, text="Вы потратили {} за неделю".format(week))
 
     elif message.text == "Сколько я потратил за месяц?":
-        month = sum_expenses("month")
+        month = int(total_expenses)
         bot.send_message(message.chat.id, text="Вы потратили {} за месяц".format(month))
 
     elif message.text == "Вернуться в главное меню":
@@ -89,6 +93,8 @@ def func(message):
         button2 = types.KeyboardButton("Посмотреть свои расходы")
         markup.add(button1, button2)
         bot.send_message(message.chat.id, text="Вы вернулись в главное меню", reply_markup=markup)
+    elif message.text == 'Добавить расход':
+        bot.send_message(message.chat.id, text='Извините, эта функция находится в разработке')
 
 
 bot.polling(none_stop=True)
