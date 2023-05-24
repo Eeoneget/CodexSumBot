@@ -1,44 +1,58 @@
+import sqlite3
 import telebot
-from telebot import types  # для указанья типов
+from telebot import types
 import config
+from datetime import datetime, timedelta
 
 bot = telebot.TeleBot(config.token, threaded=False)
 
-num = 0
-sum_num = 0
-taxi_num = 0
+conn = sqlite3.connect('expenses.db')
+cursor = conn.cursor()
 
-expense_categories = {
-    "Такси": 0.0,
-    "Дом": 0.0,
-    "Транспорт": 0.0,
-    "Еда": 0.0,
-    "Развлечения": 0.0,
-    "Другое": 0.0,
-}
+# Создаем таблицу расходов, если она не существует
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        amount REAL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+''')
+conn.commit()
 
 
-def sum_expenses(period):
-    # здесь должен быть код, который вычисляет сумму расходов за указанный период
-    # в зависимости от значения параметра period
-    # например, если period равен "day", то нужно вычислить сумму расходов за день
-    # и вернуть это значение
-    # если period равен "week", то нужно вычислить сумму расходов за неделю
-    # и вернуть это значение
-    # и т.д.
-    return sum_num
+def sum_expenses(user_id, period):
+    # Вычисляем сумму расходов за указанный период для данного пользователя
+    query = "SELECT SUM(amount) FROM expenses WHERE user_id = ? AND timestamp >= ?"
+
+    if period == "day":
+        period_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        period_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
+            days=datetime.now().weekday())
+    elif period == "month":
+        period_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    cursor.execute(query, (user_id, period_start))
+    result = cursor.fetchone()[0]
+
+    if result is not None:
+        return result
+    else:
+        return 0
 
 
 def add_expense(message):
-    if message.text == 'Такси':
-        global num, sum_num
-        try:
-            num_taxi = float(input())
-            expense_categories['Такси'] = expense_categories['Такси'] + num_taxi
-            bot.send_message(message.chat.id, text="Расход добавлен. Всего расходов На такси: {}".format(num_taxi))
-        except ValueError:
-            bot.send_message(message.chat.id, text="Введите число")
-            bot.register_next_step_handler(message, add_expense)
+    try:
+        user_id = message.from_user.id
+        amount = float(message.text)
+        cursor.execute("INSERT INTO expenses (user_id, amount) VALUES (?, ?)", (user_id, amount))
+        conn.commit()
+        bot.send_message(message.chat.id,
+                         text="Расход добавлен. Всего расходов: {}".format(sum_expenses(user_id, "day")))
+    except ValueError:
+        bot.send_message(message.chat.id, text="Введите число")
+        bot.register_next_step_handler(message, add_expense)
 
 
 @bot.message_handler(commands=['start'])
@@ -49,7 +63,7 @@ def start(message):
     btn3 = types.KeyboardButton("Добавить расход")
     markup.add(btn1, btn2, btn3)
     bot.send_message(message.chat.id,
-                     text="Привет, {0.first_name}! Я телеграмм бот для финансирование!".format(
+                     text="Привет, {0.first_name}! Я телеграмм бот для финансирования!".format(
                          message.from_user), reply_markup=markup)
 
 
@@ -59,40 +73,56 @@ def choice(message):
     btn1 = types.KeyboardButton("Сколько я потратил за день?")
     btn2 = types.KeyboardButton("Сколько я потратил за неделю?")
     btn3 = types.KeyboardButton("Сколько я потратил за месяц?")
-    btn4 = types.KeyboardButton('Добавить расход')
     back = types.KeyboardButton("Вернуться в главное меню")
-    markup.add(btn1, btn2, btn3, btn4, back)
+    markup.add(btn1, btn2, btn3, back)
     bot.send_message(message.chat.id, text="Посмотреть свои расходы", reply_markup=markup)
 
 
-@bot.message_handler(commands=['help'])
-def helping_hand(message):
-    bot.send_message(message.chat.id, text='''Напишите /choice для того чтобы ввести сколько вы потратили''')
+@bot.message_handler(commands=['expenses'])
+def view_expenses(message):
+    user_id = message.from_user.id
+    today = sum_expenses(user_id, "day")
+    week = sum_expenses(user_id, "week")
+    month = sum_expenses(user_id, "month")
+
+    response = "Суммарные расходы:\n\n"
+    response += "За день: {}\n".format(today)
+    response += "За неделю: {}\n".format(week)
+    response += "За месяц: {}\n".format(month)
+
+    bot.send_message(message.chat.id, text=response)
 
 
 @bot.message_handler(content_types=['text'])
 def func(message):
-    global num, sum_num
     if message.text == "Поздороваться":
-        bot.send_message(message.chat.id, text="""Привет Codex!
-Напишите /help для того чтобы посмотреть доступные команды""")
+        bot.send_message(message.chat.id, text="""Привет! Напишите /help, чтобы посмотреть доступные команды""")
+
+    elif message.text == "Добавить расход":
+        bot.send_message(message.chat.id, text="Введите сумму расхода:")
+        bot.register_next_step_handler(message, add_expense)
+
     elif message.text == "Сколько я потратил за день?":
-        today = sum_expenses("day")
+        user_id = message.from_user.id
+        today = sum_expenses(user_id, "day")
         bot.send_message(message.chat.id, text="Вы потратили {} за день".format(today))
 
     elif message.text == "Сколько я потратил за неделю?":
-        week = sum_expenses("week")
+        user_id = message.from_user.id
+        week = sum_expenses(user_id, "week")
         bot.send_message(message.chat.id, text="Вы потратили {} за неделю".format(week))
 
     elif message.text == "Сколько я потратил за месяц?":
-        month = sum_expenses("month")
+        user_id = message.from_user.id
+        month = sum_expenses(user_id, "month")
         bot.send_message(message.chat.id, text="Вы потратили {} за месяц".format(month))
 
     elif message.text == "Вернуться в главное меню":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         button1 = types.KeyboardButton("Поздороваться")
         button2 = types.KeyboardButton("Посмотреть свои расходы")
-        markup.add(button1, button2)
+        button3 = types.KeyboardButton('Добавить расход')
+        markup.add(button1, button2, button3)
         bot.send_message(message.chat.id, text="Вы вернулись в главное меню", reply_markup=markup)
 
 
