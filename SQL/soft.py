@@ -49,7 +49,7 @@ def add_expense(message):
         cursor.execute("INSERT INTO expenses (user_id, amount) VALUES (?, ?)", (user_id, amount))
         conn.commit()
         bot.send_message(message.chat.id,
-                         text="Расход добавлен. Всего расходов: {}".format(sum_expenses(user_id, "day")))
+                         text="Расход добавлен. Всего расходов за день: {}".format(sum_expenses(user_id, "day")))
     except ValueError:
         bot.send_message(message.chat.id, text="Введите число")
         bot.register_next_step_handler(message, add_expense)
@@ -58,12 +58,13 @@ def add_expense(message):
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn1 = types.KeyboardButton("Поздороваться")
-    btn2 = types.KeyboardButton("Посмотреть свои расходы")
-    btn3 = types.KeyboardButton("Добавить расход")
-    markup.add(btn1, btn2, btn3)
+    btn1 = types.KeyboardButton("Сколько я потратил за день?")
+    btn2 = types.KeyboardButton("Сколько я потратил за неделю?")
+    btn3 = types.KeyboardButton("Сколько я потратил за месяц?")
+    btn4 = types.KeyboardButton('Добавить расход')
+    markup.add(btn1, btn2, btn3, btn4)
     bot.send_message(message.chat.id,
-                     text="Привет, {0.first_name}! Я телеграмм бот для финансирования!".format(
+                     text="""Привет, {0.first_name}! Напишите /expenses, чтобы посмотреть сколько ты потратил""".format(
                          message.from_user), reply_markup=markup)
 
 
@@ -75,7 +76,7 @@ def choice(message):
     btn3 = types.KeyboardButton("Сколько я потратил за месяц?")
     back = types.KeyboardButton("Вернуться в главное меню")
     markup.add(btn1, btn2, btn3, back)
-    bot.send_message(message.chat.id, text="Посмотреть свои расходы", reply_markup=markup)
+    bot.send_message(message.chat.id, reply_markup=markup)
 
 
 @bot.message_handler(commands=['expenses'])
@@ -95,9 +96,16 @@ def view_expenses(message):
 
 @bot.message_handler(content_types=['text'])
 def func(message):
-    if message.text == "Поздороваться":
-        bot.send_message(message.chat.id, text="""Привет! Напишите /help, чтобы посмотреть доступные команды""")
-
+    if message.text == "Меню":
+        bot.send_message(message.chat.id, text="""Привет! Напишите /expenses, чтобы посмотреть сколько ты потратил""")
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn1 = types.KeyboardButton("Сколько я потратил за день?")
+        btn2 = types.KeyboardButton("Сколько я потратил за неделю?")
+        btn3 = types.KeyboardButton("Сколько я потратил за месяц?")
+        btn4 = types.KeyboardButton('Добавить расход')
+        back = types.KeyboardButton("Вернуться в главное меню")
+        markup.add(btn1, btn2, btn3, btn4, back)
+        bot.send_message(message.chat.id, text="Посмотреть свои расходы", reply_markup=markup)
     elif message.text == "Добавить расход":
         bot.send_message(message.chat.id, text="Введите сумму расхода:")
         bot.register_next_step_handler(message, add_expense)
@@ -120,9 +128,8 @@ def func(message):
     elif message.text == "Вернуться в главное меню":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         button1 = types.KeyboardButton("Поздороваться")
-        button2 = types.KeyboardButton("Посмотреть свои расходы")
         button3 = types.KeyboardButton('Добавить расход')
-        markup.add(button1, button2, button3)
+        markup.add(button1,  button3)
         bot.send_message(message.chat.id, text="Вы вернулись в главное меню", reply_markup=markup)
 
 
